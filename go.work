@@ -1,0 +1,7 @@
+go 1.22.0
+
+use (
+	./game_client
+	./game_server
+	./types
+)
