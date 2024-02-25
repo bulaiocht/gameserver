@@ -43,6 +43,45 @@ func (client *GameClient) login() error {
 	return client.conn.WriteJSON(msg)
 }
 
+func (client *GameClient) writeLoop() error {
+	for {
+		time.Sleep(time.Millisecond * 300)
+		if e := client.positionUpdate(); e != nil {
+			log.Printf("Unable to update player position: %s", e)
+			return e
+		}
+	}
+}
+
+func (client *GameClient) positionUpdate() error {
+
+	x := rand.Intn(1000)
+	y := rand.Intn(1000)
+	position := types.Position{
+		X: x,
+		Y: y,
+	}
+	log.Printf("sending position update: %s", fmt.Sprint(position))
+
+	posData, e := json.Marshal(position)
+	if e != nil {
+		log.Printf("Error, converting message: %s", e)
+		return e
+	}
+
+	message := types.WSMessage{
+		Type: types.PosUpdate,
+		Data: posData,
+	}
+
+	if err := client.conn.WriteJSON(message); err != nil {
+		log.Printf("Error sending message: %s", err)
+		return err
+	}
+
+	return nil
+}
+
 func main() {
 
 	dialer := websocket.Dialer{
@@ -60,29 +99,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	for {
-		time.Sleep(time.Millisecond * 300)
-		x := rand.Intn(1000)
-		y := rand.Intn(1000)
-		position := types.Position{
-			X: x,
-			Y: y,
-		}
-		log.Printf("sending position update: %s", fmt.Sprint(position))
-
-		posData, e := json.Marshal(position)
-		if e != nil {
-			log.Printf("Error, converting message: %s", e)
-			break
-		}
-		message := types.WSMessage{
-			Type: types.PosUpdate,
-			Data: posData,
-		}
-		if err = client.conn.WriteJSON(message); err != nil {
-			log.Printf("Error sending message: %s", err)
-			break
-		}
+	if e := client.writeLoop(); e != nil {
+		log.Fatal(e)
 	}
 
 }
