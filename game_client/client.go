@@ -2,11 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/bulaioch/types"
 	"github.com/gorilla/websocket"
+	"golang.org/x/net/context"
 	"log"
 	"math"
 	"math/rand"
+	"time"
 )
 
 const wsServerEndpoint = "ws://localhost:40000/ws"
@@ -34,7 +37,7 @@ func (client *GameClient) login() error {
 		return err
 	}
 	msg := types.WSMessage{
-		Type: "login",
+		Type: types.SignIn,
 		Data: login,
 	}
 	return client.conn.WriteJSON(msg)
@@ -46,14 +49,40 @@ func main() {
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 	}
-
-	conn, _, err := dialer.Dial(wsServerEndpoint, nil)
+	timeout, cancelFunc := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancelFunc()
+	conn, _, err := dialer.DialContext(timeout, wsServerEndpoint, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	client := newGameClient(conn, "Bob")
 	if err := client.login(); err != nil {
 		log.Fatal(err)
+	}
+
+	for {
+		time.Sleep(time.Millisecond * 300)
+		x := rand.Intn(1000)
+		y := rand.Intn(1000)
+		position := types.Position{
+			X: x,
+			Y: y,
+		}
+		log.Printf("sending position update: %s", fmt.Sprint(position))
+
+		posData, e := json.Marshal(position)
+		if e != nil {
+			log.Printf("Error, converting message: %s", e)
+			break
+		}
+		message := types.WSMessage{
+			Type: types.PosUpdate,
+			Data: posData,
+		}
+		if err = client.conn.WriteJSON(message); err != nil {
+			log.Printf("Error sending message: %s", err)
+			break
+		}
 	}
 
 }

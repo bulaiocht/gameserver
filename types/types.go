@@ -6,6 +6,23 @@ type Login struct {
 }
 
 type WSMessage struct {
-	Type string `json:"type"`
-	Data []byte `json:"data"`
+	Type MessageType `json:"type"`
+	Data []byte      `json:"data"`
 }
+
+type PlayerState struct {
+	Health   int      `json:"health"`
+	Position Position `json:"position"`
+}
+
+type Position struct {
+	X int `json:"x"`
+	Y int `json:"y"`
+}
+
+type MessageType string
+
+const (
+	SignIn    MessageType = "login"
+	PosUpdate             = "position_update"
+)

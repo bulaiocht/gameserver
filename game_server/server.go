@@ -16,33 +16,47 @@ import (
 // indicating whether the player is in a lobby, and a reference to
 // the player's connection.
 type PlayerSession struct {
-	sessionID int
-	inLobby   bool
-	conn      *websocket.Conn
+	sessionID   int
+	inLobby     bool
+	conn        *websocket.Conn
+	playerState types.PlayerState
 }
 
 func (session *PlayerSession) Receive(context *actor.Context) {
-	switch msg := context.Message().(type) {
+	switch context.Message().(type) {
 	case actor.Started:
 		session.readLoop()
-		_ = msg
 	}
 }
 
 func (session *PlayerSession) handleWSMessage(msg types.WSMessage) {
 	switch msg.Type {
-	case "login":
+	case types.SignIn:
 		var login types.Login
 		if err := json.Unmarshal(msg.Data, &login); err != nil {
 			log.Printf("Error unmarshalling login data: %s", err)
 			panic(err)
 		}
-		session.handleLogin(login)
+		if e := session.handleLogin(login); e != nil {
+			log.Printf("Unable to login client: %s", e)
+			panic(e)
+		}
+	case types.PosUpdate:
+		var pos types.Position
+		if err := json.Unmarshal(msg.Data, &pos); err != nil {
+			log.Printf("Error unmarshalling login data: %s", err)
+			panic(err)
+		}
+		log.Printf("position update: x=%d, y=%d", pos.X, pos.Y)
+		session.playerState.Position.X = pos.X
+		session.playerState.Position.Y = pos.Y
+
 	}
 }
 
-func (session *PlayerSession) handleLogin(msg types.Login) {
+func (session *PlayerSession) handleLogin(msg types.Login) error {
 	log.Printf("Received login message: %+v", msg)
+	return nil
 }
 
 func (session *PlayerSession) readLoop() {
@@ -53,7 +67,7 @@ func (session *PlayerSession) readLoop() {
 			log.Printf("Error reading incomming message %s:", err)
 			return
 		}
-		session.handleWSMessage(msg)
+		go session.handleWSMessage(msg)
 	}
 }
 
@@ -62,6 +76,13 @@ func newPlayerSession(sessionID int, conn *websocket.Conn) actor.Producer {
 		return &PlayerSession{
 			sessionID: sessionID,
 			conn:      conn,
+			playerState: types.PlayerState{
+				Health: 100,
+				Position: types.Position{
+					X: 0,
+					Y: 0,
+				},
+			},
 		}
 	}
 }
